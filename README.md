@@ -1,4 +1,4 @@
-# finance-dashboard
+# Finance-Dashboard
 
 A responsive **personal finance dashboard** built with React. The application runs entirely in the browser: there is **no backend**. It demonstrates dashboard layout, interactive charts, transaction management with advanced filtering and grouping, simulated role-based access, derived insights, and client-side persistence suitable for a **frontend evaluation** or portfolio piece.
 

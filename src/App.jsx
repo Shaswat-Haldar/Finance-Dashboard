@@ -1,12 +1,19 @@
-import { useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
 import { useDashboardStore } from './store/useDashboardStore'
 import { Header } from './components/Header'
+import { StickySubNav } from './components/StickySubNav'
 import { SummaryCards } from './components/SummaryCards'
-import { BalanceTrendChart } from './components/BalanceTrendChart'
-import { SpendingBreakdown } from './components/SpendingBreakdown'
 import { InsightsPanel } from './components/InsightsPanel'
 import { TransactionsSection } from './components/TransactionsSection'
 import { TransactionFormModal } from './components/TransactionFormModal'
+import { ToastViewport } from './components/ToastViewport'
+
+const BalanceTrendChart = lazy(() =>
+  import('./components/BalanceTrendChart').then((m) => ({ default: m.BalanceTrendChart })),
+)
+const SpendingBreakdown = lazy(() =>
+  import('./components/SpendingBreakdown').then((m) => ({ default: m.SpendingBreakdown })),
+)
 
 function LoadingScreen() {
   return (
@@ -17,6 +24,15 @@ function LoadingScreen() {
       />
       <p className="text-sm text-slate-500 dark:text-slate-400">Loading your dashboard…</p>
     </div>
+  )
+}
+
+function ChartSkeleton({ title }) {
+  return (
+    <section className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)] p-6 shadow-sm">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <div className="mt-4 h-64 animate-pulse rounded-xl bg-slate-200/70 dark:bg-slate-700/50" />
+    </section>
   )
 }
 
@@ -48,6 +64,17 @@ export default function App() {
   const theme = useDashboardStore((s) => s.theme)
   const role = useDashboardStore((s) => s.role)
   const closeForm = useDashboardStore((s) => s.closeForm)
+  const setSearchQuery = useDashboardStore((s) => s.setSearchQuery)
+  const setFilterType = useDashboardStore((s) => s.setFilterType)
+
+  const navItems = useMemo(
+    () => [
+      { href: '#overview', label: 'Overview' },
+      { href: '#transactions', label: 'Transactions' },
+      { href: '#insights', label: 'Insights' },
+    ],
+    [],
+  )
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -75,13 +102,32 @@ export default function App() {
     return useDashboardStore.persist.onFinishHydration(() => loadIfEmpty())
   }, [])
 
+  // URL filter sync for shareable links (?q=&type=income|expense)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('q')
+    const type = params.get('type')
+    if (q) setSearchQuery(q)
+    if (type === 'income' || type === 'expense' || type === 'all') {
+      setFilterType(type)
+    }
+  }, [setFilterType, setSearchQuery])
+
   const showLoader = apiLoading && transactions.length === 0
 
   return (
     <div className="min-h-screen pb-16">
+      <a
+        href="#main-content"
+        className="sr-only z-[100] rounded-md bg-teal-600 px-3 py-2 text-sm font-medium text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+      >
+        Skip to main content
+      </a>
       <Header />
+      <StickySubNav items={navItems} />
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-6xl px-4 py-8">
         {apiError && transactions.length === 0 && (
           <ErrorBanner message={apiError} onRetry={retryFetch} />
         )}
@@ -90,7 +136,7 @@ export default function App() {
           <LoadingScreen />
         ) : (
           <>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <section id="overview" className="mb-2 flex scroll-mt-36 flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Overview · trends · spending · insights
               </p>
@@ -102,17 +148,28 @@ export default function App() {
               >
                 Reload demo data
               </button>
-            </div>
+            </section>
 
             <div className="space-y-8">
               <SummaryCards transactions={transactions} />
 
-              <div className="grid gap-8 lg:grid-cols-2">
-                <BalanceTrendChart transactions={transactions} />
-                <SpendingBreakdown transactions={transactions} />
-              </div>
+              <Suspense
+                fallback={
+                  <div className="grid gap-8 lg:grid-cols-2">
+                    <ChartSkeleton title="Balance trend" />
+                    <ChartSkeleton title="Spending by category" />
+                  </div>
+                }
+              >
+                <div className="grid gap-8 lg:grid-cols-2">
+                  <BalanceTrendChart transactions={transactions} loading={apiLoading} />
+                  <SpendingBreakdown transactions={transactions} loading={apiLoading} />
+                </div>
+              </Suspense>
 
-              <InsightsPanel transactions={transactions} />
+              <div id="insights" className="scroll-mt-36">
+                <InsightsPanel transactions={transactions} />
+              </div>
 
               <TransactionsSection />
             </div>
@@ -125,6 +182,7 @@ export default function App() {
       <footer className="mx-auto max-w-6xl px-4 pb-8 text-center text-xs text-slate-400 dark:text-slate-500">
         Mock data & delayed API for demonstration · State persisted locally
       </footer>
+      <ToastViewport />
     </div>
   )
 }

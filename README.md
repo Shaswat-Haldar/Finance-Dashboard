@@ -137,6 +137,20 @@ Deliver a **clear, maintainable** dashboard that satisfies core UI requirements 
 | Persistence | `localStorage` via Zustand `persist` (transactions, role, theme, filters, sort, grouping). |
 | Mock API | Artificial latency in `src/api/mockApi.js`. |
 | Advanced table | Date/amount bounds, grouping, collapsible sections. |
+| Pro table polish | Pagination, density toggle, kebab row actions, undo delete snackbar. |
+| Accessibility | Skip link, focus-visible rings, table caption/scopes, aria-live result count. |
+| Feedback | Toasts for add/edit/export/reload and undo delete flow. |
+| Performance | Charts are lazy-loaded to split bundle chunks. |
+
+### Screenshots / demo GIF
+
+- Add your screenshots or a short GIF under `docs/` and reference them here.
+- Example markdown:
+
+```md
+![Dashboard overview](docs/dashboard-overview.png)
+![Transactions interaction](docs/transactions.gif)
+```
 | Polish | Focus-visible styles, `aria-*` on dialogs, responsive table scroll, button feedback states. |
 
 ---

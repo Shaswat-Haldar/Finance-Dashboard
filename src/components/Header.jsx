@@ -1,5 +1,6 @@
 import { useDashboardStore } from '../store/useDashboardStore'
 import { exportTransactionsCsv, exportTransactionsJson } from '../utils/exportData'
+import { formatDateTime } from '../utils/format'
 
 /** Shared look for header actions + tactile press feedback */
 const headerControlBase =
@@ -26,17 +27,21 @@ export function Header() {
   const theme = useDashboardStore((s) => s.theme)
   const setTheme = useDashboardStore((s) => s.setTheme)
   const transactions = useDashboardStore((s) => s.transactions)
+  const lastUpdatedAt = useDashboardStore((s) => s.lastUpdatedAt)
+  const pushToast = useDashboardStore((s) => s.pushToast)
+  const isAdmin = role === 'admin'
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)]/90 backdrop-blur-md transition-colors">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        <div className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-wider text-teal-600 dark:text-teal-400">
-            Personal finance
+            Personal finance dashboard
           </p>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-            Dashboard
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Finance Overview</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {lastUpdatedAt ? `Last updated ${formatDateTime(lastUpdatedAt)}` : 'Not updated yet'}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -47,10 +52,20 @@ export function Header() {
               value={role}
               onChange={(e) => setRole(e.target.value)}
               className={roleSelectClasses}
+              aria-label="Select role"
             >
               <option value="viewer">Viewer</option>
               <option value="admin">Admin</option>
             </select>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                isAdmin
+                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+              }`}
+            >
+              {isAdmin ? 'Can edit' : 'View only'}
+            </span>
           </label>
 
           <button
@@ -62,11 +77,14 @@ export function Header() {
             {theme === 'dark' ? 'Light' : 'Dark'}
           </button>
 
-          <div className="flex gap-2">
+          {isAdmin && <div className="flex gap-2">
             <button
               type="button"
               disabled={transactions.length === 0}
-              onClick={() => exportTransactionsCsv(transactions)}
+              onClick={() => {
+                exportTransactionsCsv(transactions)
+                pushToast('CSV exported successfully.', 'success')
+              }}
               className={headerControlBase}
             >
               CSV
@@ -74,12 +92,15 @@ export function Header() {
             <button
               type="button"
               disabled={transactions.length === 0}
-              onClick={() => exportTransactionsJson(transactions)}
+              onClick={() => {
+                exportTransactionsJson(transactions)
+                pushToast('JSON exported successfully.', 'success')
+              }}
               className={headerControlBase}
             >
               JSON
             </button>
-          </div>
+          </div>}
         </div>
       </div>
     </header>

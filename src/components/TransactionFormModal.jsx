@@ -27,8 +27,9 @@ function TransactionFormModalContent({ editing, onClose }) {
 
   const [form, setForm] = useState(() => formFromEditing(editing))
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     const amountNum = Number(form.amount)
     if (!form.date || !form.category.trim() || !form.description.trim()) {
@@ -40,11 +41,14 @@ function TransactionFormModalContent({ editing, onClose }) {
       return
     }
     setError('')
+    setSaving(true)
+    await new Promise((r) => window.setTimeout(r, 220))
     if (editing) {
       updateTransaction(editing.id, { ...form, amount: amountNum })
     } else {
       addTransaction({ ...form, amount: amountNum })
     }
+    setSaving(false)
     onClose()
   }
 
@@ -136,9 +140,10 @@ function TransactionFormModalContent({ editing, onClose }) {
           </button>
           <button
             type="submit"
+            disabled={saving}
             className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-400"
           >
-            {editing ? 'Save changes' : 'Add transaction'}
+            {saving ? 'Saving…' : editing ? 'Save changes' : 'Add transaction'}
           </button>
         </div>
       </form>

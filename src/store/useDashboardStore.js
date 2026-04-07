@@ -50,9 +50,21 @@ function clampGroupBy(v, fallback) {
   return v === 'none' || v === 'month' || v === 'category' ? v : fallback
 }
 
+function clampDensity(v, fallback) {
+  return v === 'compact' || v === 'comfortable' ? v : fallback
+}
+
+function createToast(message, tone = 'info') {
+  return {
+    id: `toast-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    message,
+    tone,
+  }
+}
+
 const initialSlice = {
   searchQuery: '',
-  filterCategory: 'all',
+  filterCategories: [],
   filterType: 'all',
   filterDateFrom: '',
   filterDateTo: '',
@@ -61,6 +73,7 @@ const initialSlice = {
   sortBy: 'date',
   sortDir: 'desc',
   groupBy: 'none',
+  density: 'comfortable',
 }
 
 export const useDashboardStore = create(
@@ -72,6 +85,8 @@ export const useDashboardStore = create(
       transactions: [],
       role: 'viewer',
       theme: 'light',
+      lastUpdatedAt: null,
+      toasts: [],
 
       ...initialSlice,
 
@@ -83,7 +98,11 @@ export const useDashboardStore = create(
         try {
           const raw = await fetchMockTransactions()
           const transactions = dedupeById(sanitizeTransactions(raw))
-          set({ transactions, apiLoading: false })
+          set({
+            transactions,
+            apiLoading: false,
+            lastUpdatedAt: new Date().toISOString(),
+          })
         } catch (e) {
           set({
             apiError: e?.message || 'Failed to load data',
@@ -108,10 +127,11 @@ export const useDashboardStore = create(
 
       setSearchQuery: (searchQuery) =>
         set({ searchQuery: typeof searchQuery === 'string' ? searchQuery : '' }),
-      setFilterCategory: (filterCategory) =>
+      setFilterCategories: (filterCategories) =>
         set({
-          filterCategory:
-            typeof filterCategory === 'string' ? filterCategory : 'all',
+          filterCategories: Array.isArray(filterCategories)
+            ? [...new Set(filterCategories.filter((x) => typeof x === 'string' && x.trim() !== ''))]
+            : [],
         }),
       setFilterType: (filterType) =>
         set({ filterType: typeof filterType === 'string' ? filterType : 'all' }),
@@ -134,6 +154,8 @@ export const useDashboardStore = create(
         }),
       setGroupBy: (groupBy) =>
         set({ groupBy: clampGroupBy(groupBy, get().groupBy) }),
+      setDensity: (density) =>
+        set({ density: clampDensity(density, get().density) }),
       setSort: (sortBy, sortDir) =>
         set({
           sortBy: clampSortBy(sortBy, get().sortBy),
@@ -141,6 +163,10 @@ export const useDashboardStore = create(
         }),
 
       resetFilters: () => set({ ...initialSlice }),
+      pushToast: (message, tone = 'info') =>
+        set((s) => ({ toasts: [...s.toasts, createToast(message, tone)] })),
+      dismissToast: (id) =>
+        set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
       openAddForm: () =>
         set({ formOpen: true, editingTransaction: null }),
@@ -160,12 +186,16 @@ export const useDashboardStore = create(
         }
         const tx = sanitizeTransaction(raw)
         if (!tx) return
-        set((s) => ({ transactions: [tx, ...s.transactions] }))
+        set((s) => ({
+          transactions: [tx, ...s.transactions],
+          lastUpdatedAt: new Date().toISOString(),
+          toasts: [...s.toasts, createToast('Transaction added.', 'success')],
+        }))
       },
 
       updateTransaction: (id, payload) => {
-        set((s) => ({
-          transactions: s.transactions.map((t) => {
+        set((s) => {
+          const transactions = s.transactions.map((t) => {
             if (t.id !== id) return t
             const raw = {
               ...t,
@@ -176,13 +206,28 @@ export const useDashboardStore = create(
               description: payload.description.trim(),
             }
             return sanitizeTransaction(raw) ?? t
-          }),
-        }))
+          })
+          return {
+            transactions,
+            lastUpdatedAt: new Date().toISOString(),
+            toasts: [...s.toasts, createToast('Transaction updated.', 'success')],
+          }
+        })
       },
 
       deleteTransaction: (id) => {
         set((s) => ({
           transactions: s.transactions.filter((t) => t.id !== id),
+          lastUpdatedAt: new Date().toISOString(),
+        }))
+      },
+      restoreTransaction: (transaction) => {
+        const tx = sanitizeTransaction(transaction)
+        if (!tx) return
+        set((s) => ({
+          transactions: dedupeById([tx, ...s.transactions]),
+          lastUpdatedAt: new Date().toISOString(),
+          toasts: [...s.toasts, createToast('Delete undone.', 'success')],
         }))
       },
 
@@ -191,7 +236,12 @@ export const useDashboardStore = create(
         try {
           const raw = await fetchMockTransactions()
           const transactions = dedupeById(sanitizeTransactions(raw))
-          set({ transactions, apiLoading: false })
+          set({
+            transactions,
+            apiLoading: false,
+            lastUpdatedAt: new Date().toISOString(),
+            toasts: [...get().toasts, createToast('Demo data reloaded.', 'info')],
+          })
         } catch (e) {
           set({
             apiError: e?.message || 'Failed to reset',
@@ -207,8 +257,9 @@ export const useDashboardStore = create(
         transactions: state.transactions,
         role: state.role,
         theme: state.theme,
+        lastUpdatedAt: state.lastUpdatedAt,
         searchQuery: state.searchQuery,
-        filterCategory: state.filterCategory,
+        filterCategories: state.filterCategories,
         filterType: state.filterType,
         filterDateFrom: state.filterDateFrom,
         filterDateTo: state.filterDateTo,
@@ -217,6 +268,7 @@ export const useDashboardStore = create(
         sortBy: state.sortBy,
         sortDir: state.sortDir,
         groupBy: state.groupBy,
+        density: state.density,
       }),
       merge: (persisted, current) => {
         const p =
@@ -232,10 +284,10 @@ export const useDashboardStore = create(
         merged.sortBy = clampSortBy(merged.sortBy, current.sortBy)
         merged.sortDir = clampSortDir(merged.sortDir, current.sortDir)
         merged.groupBy = clampGroupBy(merged.groupBy, current.groupBy)
-        merged.filterCategory =
-          typeof merged.filterCategory === 'string'
-            ? merged.filterCategory
-            : current.filterCategory
+        merged.density = clampDensity(merged.density, current.density)
+        merged.filterCategories = Array.isArray(merged.filterCategories)
+          ? [...new Set(merged.filterCategories.filter((x) => typeof x === 'string' && x.trim() !== ''))]
+          : []
         merged.filterType =
           typeof merged.filterType === 'string'
             ? merged.filterType
@@ -258,6 +310,9 @@ export const useDashboardStore = create(
           typeof merged.filterAmountMax === 'string'
             ? merged.filterAmountMax
             : ''
+        merged.lastUpdatedAt =
+          typeof merged.lastUpdatedAt === 'string' ? merged.lastUpdatedAt : null
+        merged.toasts = []
         return merged
       },
     },

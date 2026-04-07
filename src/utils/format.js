@@ -26,6 +26,18 @@ export function formatDate(isoDate) {
   }).format(d)
 }
 
+export function formatDateTime(isoDateTime) {
+  const d = parseISODate(isoDateTime)
+  if (!d) return '—'
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(d)
+}
+
 export function monthKey(isoDate) {
   const d = parseISODate(isoDate)
   if (!d) return null

@@ -12,7 +12,7 @@ function compareDateStrings(a, b) {
 export function useFilteredTransactions() {
   const transactions = useDashboardStore((s) => s.transactions)
   const searchQuery = useDashboardStore((s) => s.searchQuery)
-  const filterCategory = useDashboardStore((s) => s.filterCategory)
+  const filterCategories = useDashboardStore((s) => s.filterCategories)
   const filterType = useDashboardStore((s) => s.filterType)
   const filterDateFrom = useDashboardStore((s) => s.filterDateFrom)
   const filterDateTo = useDashboardStore((s) => s.filterDateTo)
@@ -37,7 +37,7 @@ export function useFilteredTransactions() {
 
     let list = safe.filter((t) => {
       if (filterType !== 'all' && t.type !== filterType) return false
-      if (filterCategory !== 'all' && t.category !== filterCategory) return false
+      if (filterCategories.length > 0 && !filterCategories.includes(t.category)) return false
 
       if (from && compareDateStrings(t.date, from) < 0) return false
       if (to && compareDateStrings(t.date, to) > 0) return false
@@ -67,7 +67,7 @@ export function useFilteredTransactions() {
   }, [
     transactions,
     searchQuery,
-    filterCategory,
+    filterCategories,
     filterType,
     filterDateFrom,
     filterDateTo,

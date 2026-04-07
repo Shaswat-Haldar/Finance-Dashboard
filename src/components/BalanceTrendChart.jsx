@@ -1,6 +1,7 @@
 import {
   Area,
   AreaChart,
+  Brush,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -11,8 +12,22 @@ import { balanceTrendByMonth } from '../utils/aggregates'
 import { formatCurrency } from '../utils/format'
 import { EmptyState } from './EmptyState'
 
-export function BalanceTrendChart({ transactions }) {
+export function BalanceTrendChart({ transactions, loading = false }) {
   const data = balanceTrendByMonth(transactions)
+  const strokeColor =
+    typeof document !== 'undefined' &&
+    document.documentElement.classList.contains('dark')
+      ? '#2dd4bf'
+      : '#0d9488'
+
+  if (loading) {
+    return (
+      <section className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)] p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Balance trend</h2>
+        <div className="mt-6 h-64 animate-pulse rounded-xl bg-slate-200/70 dark:bg-slate-700/50" />
+      </section>
+    )
+  }
 
   if (data.length === 0) {
     return (
@@ -42,8 +57,8 @@ export function BalanceTrendChart({ transactions }) {
           <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="balFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0d9488" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#0d9488" stopOpacity={0} />
+                <stop offset="0%" stopColor={strokeColor} stopOpacity={0.35} />
+                <stop offset="100%" stopColor={strokeColor} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-600" />
@@ -64,15 +79,16 @@ export function BalanceTrendChart({ transactions }) {
                 borderRadius: '12px',
                 border: '1px solid var(--color-border-subtle)',
               }}
-              formatter={(value) => [formatCurrency(value), 'Balance']}
+              formatter={(value, _name, item) => [formatCurrency(value), item?.dataKey === 'net' ? 'Net' : 'Balance']}
             />
             <Area
               type="monotone"
               dataKey="balance"
-              stroke="#0d9488"
+              stroke={strokeColor}
               strokeWidth={2}
               fill="url(#balFill)"
             />
+            <Brush dataKey="month" height={20} travellerWidth={10} />
           </AreaChart>
         </ResponsiveContainer>
       </div>

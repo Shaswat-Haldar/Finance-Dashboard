@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useDashboardStore } from '../store/useDashboardStore'
 import {
   buildTransactionGroups,
@@ -19,8 +19,8 @@ export function TransactionsSection() {
   const openAddForm = useDashboardStore((s) => s.openAddForm)
   const searchQuery = useDashboardStore((s) => s.searchQuery)
   const setSearchQuery = useDashboardStore((s) => s.setSearchQuery)
-  const filterCategory = useDashboardStore((s) => s.filterCategory)
-  const setFilterCategory = useDashboardStore((s) => s.setFilterCategory)
+  const filterCategories = useDashboardStore((s) => s.filterCategories)
+  const setFilterCategories = useDashboardStore((s) => s.setFilterCategories)
   const filterType = useDashboardStore((s) => s.filterType)
   const setFilterType = useDashboardStore((s) => s.setFilterType)
   const filterDateFrom = useDashboardStore((s) => s.filterDateFrom)
@@ -37,12 +37,29 @@ export function TransactionsSection() {
   const sortBy = useDashboardStore((s) => s.sortBy)
   const sortDir = useDashboardStore((s) => s.sortDir)
   const setSort = useDashboardStore((s) => s.setSort)
+  const density = useDashboardStore((s) => s.density)
+  const setDensity = useDashboardStore((s) => s.setDensity)
   const allTransactions = useDashboardStore((s) => s.transactions)
 
   const filtered = useFilteredTransactions()
   const categories = useCategoryOptions()
 
   const isAdmin = role === 'admin'
+  const [pageSize, setPageSize] = useState(10)
+  const [currentPage, setCurrentPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const visiblePage = Math.min(currentPage, totalPages)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (searchQuery) params.set('q', searchQuery)
+    else params.delete('q')
+    if (filterType !== 'all') params.set('type', filterType)
+    else params.delete('type')
+    const next = `${window.location.pathname}?${params.toString()}${window.location.hash}`
+    window.history.replaceState({}, '', next)
+  }, [searchQuery, filterType])
 
   const dateRangeInvalid =
     Boolean(filterDateFrom.trim() && filterDateTo.trim()) &&
@@ -90,23 +107,42 @@ export function TransactionsSection() {
             />
           </div>
           <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-auto lg:min-w-0 lg:flex-[2]">
-            <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Category
-              </label>
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className={filterSelectClass}
-              >
-                <option value="all">All categories</option>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <details className="relative">
+              <summary className={`list-none ${filterSelectClass} cursor-pointer`}>
+                Categories
+                {filterCategories.length > 0 ? ` (${filterCategories.length})` : ' (All)'}
+              </summary>
+              <div className="absolute left-0 top-full z-20 mt-2 max-h-56 w-56 overflow-y-auto rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)] p-3 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => setFilterCategories([])}
+                  className="mb-2 text-xs text-teal-700 underline"
+                >
+                  Clear categories
+                </button>
+                <div className="space-y-1">
+                  {categories.map((c) => {
+                    const checked = filterCategories.includes(c)
+                    return (
+                      <label key={c} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            if (checked) {
+                              setFilterCategories(filterCategories.filter((x) => x !== c))
+                            } else {
+                              setFilterCategories([...filterCategories, c])
+                            }
+                          }}
+                        />
+                        <span>{c}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            </details>
             <div>
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
                 Type
@@ -234,6 +270,32 @@ export function TransactionsSection() {
             <option value="category">Category</option>
           </select>
         </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Density</label>
+          <select
+            value={density}
+            onChange={(e) => setDensity(e.target.value)}
+            className={filterSelectClass}
+          >
+            <option value="comfortable">Comfortable</option>
+            <option value="compact">Compact</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Rows</label>
+          <select
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value))
+              setCurrentPage(1)
+            }}
+            className={filterSelectClass}
+          >
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+          </select>
+        </div>
       </div>
 
       {allTransactions.length === 0 ? (
@@ -251,17 +313,41 @@ export function TransactionsSection() {
       ) : (
         <TransactionsDataTable
           key={groupBy}
-          filtered={filtered}
+          filtered={filtered.slice((visiblePage - 1) * pageSize, visiblePage * pageSize)}
+          density={density}
           groupBy={groupBy}
           isAdmin={isAdmin}
         />
       )}
 
       {allTransactions.length > 0 && (
-        <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-500">
+        <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-500" aria-live="polite">
           Showing {filtered.length} of {allTransactions.length} transactions
           {groupBy !== 'none' && ` · grouped by ${groupBy}`}
         </p>
+      )}
+      {filtered.length > 0 && (
+        <div className="mt-3 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={visiblePage <= 1}
+            className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1 text-sm disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="text-sm text-slate-500">
+            Page {visiblePage} of {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={visiblePage >= totalPages}
+            className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1 text-sm disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
       )}
 
       {!isAdmin && (
@@ -274,16 +360,25 @@ export function TransactionsSection() {
   )
 }
 
-function TransactionsDataTable({ filtered, groupBy, isAdmin }) {
+function TransactionsDataTable({ filtered, groupBy, isAdmin, density }) {
   const openEditForm = useDashboardStore((s) => s.openEditForm)
   const deleteTransaction = useDashboardStore((s) => s.deleteTransaction)
+  const restoreTransaction = useDashboardStore((s) => s.restoreTransaction)
   const groups = useMemo(
     () => buildTransactionGroups(filtered, groupBy),
     [filtered, groupBy],
   )
   const [collapsed, setCollapsed] = useState({})
   const [pendingDelete, setPendingDelete] = useState(null)
+  const [undoItem, setUndoItem] = useState(null)
   const colCount = isAdmin ? 6 : 5
+  const rowClass = density === 'compact' ? 'py-2' : 'py-3'
+
+  useEffect(() => {
+    if (!undoItem) return
+    const id = window.setTimeout(() => setUndoItem(null), 4500)
+    return () => window.clearTimeout(id)
+  }, [undoItem])
 
   const expandAllGroups = () => setCollapsed({})
   const collapseAllGroups = () => {
@@ -303,14 +398,14 @@ function TransactionsDataTable({ filtered, groupBy, isAdmin }) {
       key={t.id}
       className="border-b border-[var(--color-border-subtle)] transition-colors hover:bg-teal-500/[0.04] dark:hover:bg-teal-500/[0.06]"
     >
-      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
+      <td className={`whitespace-nowrap px-4 ${rowClass} text-slate-600 dark:text-slate-300`}>
         {formatDate(t.date)}
       </td>
-      <td className="max-w-[200px] truncate px-4 py-3 text-slate-800 dark:text-slate-100">
+      <td className={`max-w-[200px] truncate px-4 ${rowClass} text-slate-800 dark:text-slate-100`}>
         {t.description}
       </td>
-      <td className="px-4 py-3">{t.category}</td>
-      <td className="px-4 py-3">
+      <td className={`px-4 ${rowClass}`}>{t.category}</td>
+      <td className={`px-4 ${rowClass}`}>
         <span
           className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
             t.type === 'income'
@@ -322,7 +417,7 @@ function TransactionsDataTable({ filtered, groupBy, isAdmin }) {
         </span>
       </td>
       <td
-        className={`px-4 py-3 text-right font-medium tabular-nums ${
+        className={`px-4 ${rowClass} text-right font-medium tabular-nums ${
           t.type === 'income'
             ? 'text-emerald-700 dark:text-emerald-400'
             : 'text-slate-800 dark:text-slate-100'
@@ -332,21 +427,28 @@ function TransactionsDataTable({ filtered, groupBy, isAdmin }) {
         {formatCurrency(t.amount)}
       </td>
       {isAdmin && (
-        <td className="whitespace-nowrap px-4 py-3 text-right">
-          <button
-            type="button"
-            onClick={() => openEditForm(t)}
-            className="mr-2 text-teal-600 hover:underline dark:text-teal-400"
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => setPendingDelete(t)}
-            className="text-rose-600 hover:underline dark:text-rose-400"
-          >
-            Delete
-          </button>
+        <td className={`whitespace-nowrap px-4 ${rowClass} text-right`}>
+          <details className="relative inline-block text-left">
+            <summary className="list-none cursor-pointer rounded-md px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-700">
+              ⋮
+            </summary>
+            <div className="absolute right-0 z-10 mt-1 w-28 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)] p-1 shadow-lg">
+              <button
+                type="button"
+                onClick={() => openEditForm(t)}
+                className="block w-full rounded px-2 py-1 text-left text-sm hover:bg-teal-50 dark:hover:bg-slate-700"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingDelete(t)}
+                className="block w-full rounded px-2 py-1 text-left text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-700"
+              >
+                Delete
+              </button>
+            </div>
+          </details>
         </td>
       )}
     </tr>
@@ -363,7 +465,10 @@ function TransactionsDataTable({ filtered, groupBy, isAdmin }) {
         confirmVariant="danger"
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => {
-          if (pendingDelete) deleteTransaction(pendingDelete.id)
+          if (pendingDelete) {
+            deleteTransaction(pendingDelete.id)
+            setUndoItem(pendingDelete)
+          }
           setPendingDelete(null)
         }}
       >
@@ -402,14 +507,15 @@ function TransactionsDataTable({ filtered, groupBy, isAdmin }) {
       )}
       <div className="overflow-x-auto rounded-xl border border-[var(--color-border-subtle)]">
         <table className="min-w-[640px] w-full border-collapse text-left text-sm">
+          <caption className="sr-only">Transactions table with date, category, type and amount.</caption>
           <thead>
             <tr className="border-b border-[var(--color-border-subtle)] bg-[var(--color-surface)] text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-              <th className="px-4 py-3 font-medium">Date</th>
-              <th className="px-4 py-3 font-medium">Description</th>
-              <th className="px-4 py-3 font-medium">Category</th>
-              <th className="px-4 py-3 font-medium">Type</th>
-              <th className="px-4 py-3 font-medium text-right">Amount</th>
-              {isAdmin && <th className="px-4 py-3 font-medium text-right">Actions</th>}
+              <th scope="col" className="px-4 py-3 font-medium">Date</th>
+              <th scope="col" className="px-4 py-3 font-medium">Description</th>
+              <th scope="col" className="px-4 py-3 font-medium">Category</th>
+              <th scope="col" className="px-4 py-3 font-medium">Type</th>
+              <th scope="col" className="px-4 py-3 font-medium text-right">Amount</th>
+              {isAdmin && <th scope="col" className="px-4 py-3 font-medium text-right">Actions</th>}
             </tr>
           </thead>
           {groups.map((group) => (
@@ -443,6 +549,21 @@ function TransactionsDataTable({ filtered, groupBy, isAdmin }) {
           ))}
         </table>
       </div>
+      {undoItem && (
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+          <p>Transaction deleted.</p>
+          <button
+            type="button"
+            onClick={() => {
+              restoreTransaction(undoItem)
+              setUndoItem(null)
+            }}
+            className="font-semibold text-amber-700 underline dark:text-amber-300"
+          >
+            Undo
+          </button>
+        </div>
+      )}
     </div>
   )
 }

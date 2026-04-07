@@ -3,9 +3,18 @@ import { spendingByCategory, withChartColors } from '../utils/aggregates'
 import { formatCurrency } from '../utils/format'
 import { EmptyState } from './EmptyState'
 
-export function SpendingBreakdown({ transactions }) {
+export function SpendingBreakdown({ transactions, loading = false }) {
   const raw = spendingByCategory(transactions)
   const data = withChartColors(raw)
+
+  if (loading) {
+    return (
+      <section className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)] p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Spending by category</h2>
+        <div className="mt-6 h-56 animate-pulse rounded-xl bg-slate-200/70 dark:bg-slate-700/50" />
+      </section>
+    )
+  }
 
   if (data.length === 0) {
     return (

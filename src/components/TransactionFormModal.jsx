@@ -42,7 +42,6 @@ function TransactionFormModalContent({ editing, onClose }) {
     }
     setError('')
     setSaving(true)
-    await new Promise((r) => window.setTimeout(r, 220))
     if (editing) {
       updateTransaction(editing.id, { ...form, amount: amountNum })
     } else {

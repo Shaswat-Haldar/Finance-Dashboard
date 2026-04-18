@@ -3,7 +3,7 @@ import App from './App'
 import { useDashboardStore } from './store/useDashboardStore'
 
 const AUTH_ROUTES = new Set(['/login', '/register'])
-const DEMO_ROUTE = '/demo'
+const DASHBOARD_ROUTE = '/dashboard'
 
 function ThemeToggleButton() {
   const theme = useDashboardStore((s) => s.theme)
@@ -26,8 +26,34 @@ function navigateTo(path, setPathname) {
   setPathname(path)
 }
 
-function AuthLayout({ mode, onSwitch, onOpenDemo }) {
+function AuthLayout({ mode, onSwitch, onDemo }) {
   const isLogin = mode === 'login'
+  const register = useDashboardStore((s) => s.register)
+  const login = useDashboardStore((s) => s.login)
+  const loading = useDashboardStore((s) => s.apiLoading)
+  const error = useDashboardStore((s) => s.apiError)
+  const pushToast = useDashboardStore((s) => s.pushToast)
+
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+  })
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    let result
+    if (isLogin) {
+      result = await login(formData.email, formData.password)
+    } else {
+      result = await register(formData.name, formData.email, formData.password)
+    }
+
+    if (result.success) {
+      pushToast(isLogin ? 'Welcome back!' : 'Account created successfully!', 'success')
+      navigateTo(DASHBOARD_ROUTE, window.setPathnameFromOuter)
+    }
+  }
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
@@ -54,63 +80,62 @@ function AuthLayout({ mode, onSwitch, onOpenDemo }) {
                 : 'Register your account to start tracking transactions and exploring insights.'}
             </p>
 
-            <form className="mt-8 space-y-4" onSubmit={(e) => e.preventDefault()}>
-              {isLogin ? (
+            {error && (
+              <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
+                {error}
+              </div>
+            )}
+
+            <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+              {!isLogin && (
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                    Username / Email
+                    Full Name
                   </span>
                   <input
+                    required
                     type="text"
-                    placeholder="Enter your username or email"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Enter your full name"
                     className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-4 py-3 text-sm outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-muted)]"
-                    autoComplete="username"
                   />
                 </label>
-              ) : (
-                <>
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Full Name
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Enter your full name"
-                      className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-4 py-3 text-sm outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-muted)]"
-                      autoComplete="name"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Email
-                    </span>
-                    <input
-                      type="email"
-                      placeholder="Enter your email"
-                      className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-4 py-3 text-sm outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-muted)]"
-                      autoComplete="email"
-                    />
-                  </label>
-                </>
               )}
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Email Address
+                </span>
+                <input
+                  required
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Enter your email"
+                  className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-4 py-3 text-sm outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-muted)]"
+                />
+              </label>
 
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
                   Password
                 </span>
                 <input
+                  required
                   type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   placeholder="Enter your password"
                   className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-4 py-3 text-sm outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-muted)]"
-                  autoComplete={isLogin ? 'current-password' : 'new-password'}
                 />
               </label>
 
               <button
                 type="submit"
-                className="w-full rounded-xl bg-[var(--color-accent)] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110"
+                disabled={loading}
+                className="w-full rounded-xl bg-[var(--color-accent)] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-70"
               >
-                {isLogin ? 'Login' : 'Register'}
+                {loading ? 'Processing...' : isLogin ? 'Login' : 'Register'}
               </button>
             </form>
 
@@ -128,28 +153,28 @@ function AuthLayout({ mode, onSwitch, onOpenDemo }) {
 
           <aside className="p-8 lg:p-10">
             <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
-              Explore Demo Dashboard
+              Try the Demo Account
             </h2>
             <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-              Use the demo workspace to preview the full finance dashboard experience.
-              The Demo button opens your current frontend with mock data, charts, and
-              transaction management for presentation and testing.
+              Access the pre-loaded finance dashboard with mock data and trends. 
+              No registration required for the demo experience.
             </p>
 
             <div className="mt-8 rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-5">
               <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                Demo access
+                Demo Workspace
               </p>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                No backend auth required right now. Click below to open the current
-                demo dashboard directly.
+                Uses credentials: <br/>
+                <b>demo@zuvlyn.com</b> / <b>Demo1234!</b>
               </p>
               <button
                 type="button"
-                onClick={onOpenDemo}
+                onClick={onDemo}
+                disabled={loading}
                 className="mt-4 w-full rounded-xl border border-[var(--color-accent)] bg-[var(--color-accent-muted)] px-4 py-3 text-sm font-semibold text-[var(--color-accent)] transition hover:brightness-95"
               >
-                Demo
+                Open Demo
               </button>
             </div>
           </aside>
@@ -162,6 +187,11 @@ function AuthLayout({ mode, onSwitch, onOpenDemo }) {
 export function RootRouter() {
   const [pathname, setPathname] = useState(() => window.location.pathname)
   const theme = useDashboardStore((s) => s.theme)
+  const token = useDashboardStore((s) => s.token)
+  const login = useDashboardStore((s) => s.login)
+
+  // Expose setPathname for the inner layout to use without props drilling deep
+  window.setPathnameFromOuter = setPathname
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -173,17 +203,29 @@ export function RootRouter() {
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
+  // Navigation Logic
   useEffect(() => {
-    const valid = AUTH_ROUTES.has(pathname) || pathname === DEMO_ROUTE
-    if (!valid) {
-      window.history.replaceState({}, '', '/login')
-      setPathname('/login')
+    const isAuth = AUTH_ROUTES.has(pathname)
+    
+    if (token) {
+      if (isAuth || pathname === '/') {
+        navigateTo(DASHBOARD_ROUTE, setPathname)
+      }
+    } else {
+      if (!isAuth) {
+        navigateTo('/login', setPathname)
+      }
     }
-  }, [pathname])
+  }, [pathname, token])
 
   const mode = useMemo(() => (pathname === '/register' ? 'register' : 'login'), [pathname])
 
-  if (pathname === DEMO_ROUTE) {
+  const handleDemo = async () => {
+    const res = await login('demo@zuvlyn.com', 'Demo1234!')
+    if (res.success) navigateTo(DASHBOARD_ROUTE, setPathname)
+  }
+
+  if (token && pathname === DASHBOARD_ROUTE) {
     return <App />
   }
 
@@ -191,7 +233,7 @@ export function RootRouter() {
     <AuthLayout
       mode={mode}
       onSwitch={() => navigateTo(mode === 'login' ? '/register' : '/login', setPathname)}
-      onOpenDemo={() => navigateTo(DEMO_ROUTE, setPathname)}
+      onDemo={handleDemo}
     />
   )
 }

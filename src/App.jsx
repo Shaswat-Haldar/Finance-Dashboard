@@ -22,7 +22,7 @@ function LoadingScreen() {
         className="h-10 w-10 animate-spin rounded-full border-2 border-teal-500 border-t-transparent dark:border-teal-400"
         aria-hidden
       />
-      <p className="text-sm text-slate-500 dark:text-slate-400">Loading your dashboard…</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">Loading your data…</p>
     </div>
   )
 }
@@ -42,14 +42,14 @@ function ErrorBanner({ message, onRetry }) {
       className="mx-auto mb-6 max-w-6xl rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-100"
       role="alert"
     >
-      <p className="font-medium">Could not load data</p>
+      <p className="font-medium">Sync interrupted</p>
       <p className="mt-1 opacity-90">{message}</p>
       <button
         type="button"
         onClick={onRetry}
         className="mt-3 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-800"
       >
-        Retry
+        Retry Sync
       </button>
     </div>
   )
@@ -57,12 +57,12 @@ function ErrorBanner({ message, onRetry }) {
 
 export default function App() {
   const transactions = useDashboardStore((s) => s.transactions)
+  const analytics = useDashboardStore((s) => s.analytics)
   const apiLoading = useDashboardStore((s) => s.apiLoading)
   const apiError = useDashboardStore((s) => s.apiError)
-  const retryFetch = useDashboardStore((s) => s.retryFetch)
-  const resetDemoData = useDashboardStore((s) => s.resetDemoData)
+  const fetchInitialData = useDashboardStore((s) => s.fetchInitialData)
   const theme = useDashboardStore((s) => s.theme)
-  const role = useDashboardStore((s) => s.role)
+  const user = useDashboardStore((s) => s.user)
   const closeForm = useDashboardStore((s) => s.closeForm)
   const setSearchQuery = useDashboardStore((s) => s.setSearchQuery)
   const setFilterType = useDashboardStore((s) => s.setFilterType)
@@ -81,28 +81,15 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
-    if (role === 'viewer') closeForm()
-  }, [role, closeForm])
+    if (user?.role === 'viewer') closeForm()
+  }, [user?.role, closeForm])
 
-  const initialFetchStarted = useRef(false)
-
+  // Fetch data on mount
   useEffect(() => {
-    const loadIfEmpty = () => {
-      if (initialFetchStarted.current) return
-      const { transactions: txs, fetchInitialData: load, apiLoading } =
-        useDashboardStore.getState()
-      if (txs.length > 0 || apiLoading) return
-      initialFetchStarted.current = true
-      load()
-    }
+    fetchInitialData()
+  }, [fetchInitialData])
 
-    if (useDashboardStore.persist.hasHydrated()) {
-      loadIfEmpty()
-    }
-    return useDashboardStore.persist.onFinishHydration(() => loadIfEmpty())
-  }, [])
-
-  // URL filter sync for shareable links (?q=&type=income|expense)
+  // URL filter sync
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
@@ -129,7 +116,7 @@ export default function App() {
 
       <main id="main-content" className="mx-auto max-w-6xl px-4 py-8">
         {apiError && transactions.length === 0 && (
-          <ErrorBanner message={apiError} onRetry={retryFetch} />
+          <ErrorBanner message={apiError} onRetry={fetchInitialData} />
         )}
 
         {showLoader ? (
@@ -138,19 +125,12 @@ export default function App() {
           <>
             <section id="overview" className="mb-2 flex scroll-mt-36 flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Overview · trends · spending · insights
+                Live analytics · real-time sync · {transactions.length} transactions
               </p>
-              <button
-                type="button"
-                onClick={() => resetDemoData()}
-                disabled={apiLoading}
-                className="text-xs font-medium text-teal-700 underline-offset-2 hover:underline disabled:opacity-50 dark:text-teal-400"
-              >
-                Reload demo data
-              </button>
             </section>
 
             <div className="space-y-8">
+              {/* SummaryCards can use analytics.summary or calculate from transactions */}
               <SummaryCards transactions={transactions} />
 
               <Suspense
@@ -162,7 +142,7 @@ export default function App() {
                 }
               >
                 <div className="grid gap-8 lg:grid-cols-2">
-                  <BalanceTrendChart transactions={transactions} loading={apiLoading} />
+                  <BalanceTrendChart transactions={analytics.trend} loading={apiLoading} />
                   <SpendingBreakdown transactions={transactions} loading={apiLoading} />
                 </div>
               </Suspense>
@@ -180,7 +160,7 @@ export default function App() {
       <TransactionFormModal />
 
       <footer className="mx-auto max-w-6xl px-4 pb-8 text-center text-xs text-slate-400 dark:text-slate-500">
-        Mock data & delayed API for demonstration · State persisted locally
+        Zuvlyn Finance · Connected to PostgreSQL · Secure JWT Sessions
       </footer>
       <ToastViewport />
     </div>

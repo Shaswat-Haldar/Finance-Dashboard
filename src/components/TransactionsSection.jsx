@@ -15,7 +15,7 @@ function compareDateStrings(a, b) {
 }
 
 export function TransactionsSection() {
-  const role = useDashboardStore((s) => s.role)
+  const user = useDashboardStore((s) => s.user)
   const openAddForm = useDashboardStore((s) => s.openAddForm)
   const searchQuery = useDashboardStore((s) => s.searchQuery)
   const setSearchQuery = useDashboardStore((s) => s.setSearchQuery)
@@ -43,8 +43,7 @@ export function TransactionsSection() {
 
   const filtered = useFilteredTransactions()
   const categories = useCategoryOptions()
-
-  const isAdmin = role === 'admin'
+  const isAdmin = user?.role === 'admin'
   const [pageSize, setPageSize] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -302,7 +301,7 @@ export function TransactionsSection() {
         <EmptyState
           className="mt-8"
           title="No transactions"
-          description="Data will appear after the mock API loads, or once you add entries as an admin."
+          description="Your financial activity will appear here once you start adding transactions."
         />
       ) : filtered.length === 0 ? (
         <EmptyState

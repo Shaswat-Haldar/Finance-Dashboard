@@ -142,7 +142,7 @@ export default function App() {
                 }
               >
                 <div className="grid gap-8 lg:grid-cols-2">
-                  <BalanceTrendChart transactions={analytics.trend} loading={apiLoading} />
+                  <BalanceTrendChart trendData={analytics.trend} loading={apiLoading} />
                   <SpendingBreakdown transactions={transactions} loading={apiLoading} />
                 </div>
               </Suspense>

@@ -9,11 +9,26 @@ import {
   YAxis,
 } from 'recharts'
 import { balanceTrendByMonth } from '../utils/aggregates'
-import { formatCurrency } from '../utils/format'
+import { formatCurrency, monthLabel } from '../utils/format'
 import { EmptyState } from './EmptyState'
 
-export function BalanceTrendChart({ transactions, loading = false }) {
-  const data = balanceTrendByMonth(transactions)
+export function BalanceTrendChart({ trendData, transactions, loading = false }) {
+  let data = []
+  if (trendData && trendData.length > 0) {
+    let running = 0
+    data = trendData.map((d) => {
+      running += d.balance // backend 'balance' is the monthly net
+      return {
+        month: monthLabel(d.month),
+        monthKey: d.month,
+        net: d.balance,
+        balance: running,
+      }
+    })
+  } else if (transactions) {
+    data = balanceTrendByMonth(transactions)
+  }
+
   const strokeColor =
     typeof document !== 'undefined' &&
     document.documentElement.classList.contains('dark')

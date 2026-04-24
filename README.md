@@ -1,4 +1,4 @@
-# Finance Dashboard
+# Financial Analytics Platform
 
 A production-grade, full-stack personal finance application designed for scalability, security, and high performance. Built with a modern **React 19** frontend, a high-speed **Hono (Node.js)** API, and a persistent **PostgreSQL** database managed via **Drizzle ORM**.
 
